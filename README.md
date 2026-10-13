@@ -77,3 +77,20 @@ cp .env.example .env
 | `npm run format:check` | Prettier 포맷 검사          |
 | `npm test`             | Vitest 테스트 실행          |
 | `npm run verify`       | 전체 검증 파이프라인        |
+
+## 브랜치 이름
+
+이 저장소의 기본 브랜치는 `main` 하나입니다. 작업 브랜치를 만들어 `main`으로 PR을 보냅니다.
+
+브랜치 이름은 MindSignal 제품 공통 규칙을 따릅니다.
+
+- 등록된 Work에 속한 작업: `{타입}/{work-id}-{작업명}`. 작업이 등록된 Work의 범위와 완료 조건에 들어가면 타입과 관계없이 Work ID 전체를 소문자로 바꿔 넣습니다. 실제 병합 이력의 예: `feat/ops-w013-proxy-status`
+- Work에 속하지 않는 작업: `{타입}/{작업명}` 또는 `{타입}/{이슈번호}-{작업명}`. 형식 예: `fix/readme-link`, `fix/123-readme-link`. 이슈 번호 앞의 `#`은 적어도 되고 생략해도 됩니다.
+- Work에 속한 브랜치에는 이슈 번호를 Work ID 대신 쓰지 않습니다. 이슈는 PR 본문에서 연결합니다.
+- 작업명은 영문 소문자, 숫자, 하이픈으로 씁니다.
+- `{타입}`은 작업의 최종 목적에 따라 `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`, `revert`, `perf`, `style` 중 하나를 선택합니다.
+- 운영 긴급 수정에는 브랜치 접두사 `hotfix`도 사용할 수 있습니다. `hotfix`는 커밋 유형이 아닙니다. `hotfix`는 `{타입}` 자리에 쓰며 형식은 다른 타입과 같습니다. Work에 속하면 `hotfix/{work-id}-{작업명}`, 속하지 않으면 `hotfix/{작업명}` 또는 `hotfix/{이슈번호}-{작업명}`입니다.
+- 계획판에 접근할 수 없으면 전달받은 Work ID와 작업 범위로 판단합니다. Work ID를 전달받지 못했으면 Work에 속하지 않는 작업의 형식을 사용합니다.
+- 이미 만든 브랜치는 이 규칙을 이유로 개명하지 않습니다.
+
+Work ID는 제품 계획판의 작업 번호입니다(`{DOMAIN}-W{NNN}`, 예: `OPS-W015`). 규칙의 정본은 저장소 밖 `mind-signal/.plans/README.md`의 「브랜치 이름」 절입니다.
