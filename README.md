@@ -2,7 +2,17 @@
 
 EEG 데이터 프록시 서버 (Node 20+, TypeScript, Express, Zod, socket.io-client).
 
-`/register`, `/heartbeat`, `/ingest`, `/control/assign-group` 엔드포인트가 배선돼 실제 서비스 로직을 수행합니다(`src/tests/index.wiring.test.ts`가 501이 아님을 단언). 현행 계약은 `../docs/architecture/api-contract.md`의 프록시 경유 계약 절, 4레포 공통 제품 문서는 `../docs/`, 작업 상태 정본은 `../.plans/DASHBOARD.md`입니다.
+`/register`, `/heartbeat`, `/ingest`, `/status`, `/control/assign-group` 엔드포인트가 배선돼 실제 서비스 로직을 수행합니다(`src/tests/index.wiring.test.ts`가 501이 아님을 단언). 현행 계약은 `../docs/architecture/api-contract.md`의 프록시 경유 계약 절, 4레포 공통 제품 문서는 `../docs/`, 작업 상태 정본은 `../.plans/DASHBOARD.md`입니다.
+
+### POST /status (헤드셋 상태 경보)
+
+데이터 엔진이 `MESSAGE_BUS=memory`일 때 Redis 대신 이 엔드포인트로 헤드셋 상태 경보를 보냅니다.
+
+- 인증: `/ingest/sample`과 같은 `X-Engine-Secret` 헤더. 불일치하거나 프록시에 키가 없으면 401 `{ "error": "unauthorized" }`.
+- 본문: `{ "group_id": string(1자 이상), "subject_idx": number(정수 1 또는 2), "status": string, "silent_seconds"?: number }`. 검증 실패 시 400 `{ "error": "bad_request", "details": [...] }`.
+- 전달: 같은 네 필드를 백엔드 `/proxy` 네임스페이스에 `proxy:status` 이벤트로 1회 보냅니다. 백엔드 ack는 `proxy:sample`과 같은 `{ ok, retryable?, error? }`입니다.
+- 응답: ack가 `ok: true`이면 200 `{ "ok": true }`. 실패하면 `{ "ok": false, "error", "retryable" }`를 돌려주며, 백엔드 미연결(`backend_not_connected`)과 ack 1초 초과(`ack_timeout`)와 재시도 가능 거부는 503, 그 밖의 거부는 502입니다.
+- 샘플과 달리 재시도 큐에 쌓지 않습니다. 실패는 로그(`[status] backend delivery failed`)로만 남습니다.
 
 ---
 

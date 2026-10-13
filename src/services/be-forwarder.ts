@@ -1,9 +1,16 @@
 import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
 import type { SampleEnvelope } from '../types/envelope';
+import type { HeadsetStatus, StatusAck } from '../routes/status';
 
 /** Milliseconds to wait for a backend ack before treating as transport timeout (retryable). */
 const ACK_TIMEOUT_MS = 2000;
+
+/**
+ * Milliseconds to wait for a backend ack on `proxy:status`. Shorter than the sample
+ * timeout because the engine is waiting on the HTTP response with its own short limit.
+ */
+const STATUS_ACK_TIMEOUT_MS = 1000;
 
 /** Milliseconds between drain-loop ticks while connected. */
 const DRAIN_INTERVAL_MS = 50;
@@ -190,6 +197,34 @@ export class BeForwarder {
     this.queue.push({ envelope, inFlight: false });
     // Trigger an immediate drain attempt if already connected.
     this._drainOnce();
+  }
+
+  /**
+   * Send one headset status alert to the backend as event `proxy:status`.
+   * Unlike samples this is a single attempt with no queue: a stale alert replayed
+   * later would be wrong. Never rejects — failures come back as `{ ok: false }`.
+   */
+  forwardStatus(status: HeadsetStatus): Promise<StatusAck> {
+    const socket = this.socket;
+    if (!socket?.connected) {
+      return Promise.resolve({ ok: false, retryable: true, error: 'backend_not_connected' });
+    }
+    return new Promise((resolve) => {
+      socket
+        .timeout(STATUS_ACK_TIMEOUT_MS)
+        .emit('proxy:status', status, (err: Error | null, ack: StatusAck) => {
+          if (err) {
+            resolve({ ok: false, retryable: true, error: 'ack_timeout' });
+            return;
+          }
+          // The route reads ack.ok; a backend that acks with nothing must not crash it.
+          if (!ack || typeof ack.ok !== 'boolean') {
+            resolve({ ok: false, retryable: false, error: 'invalid_ack' });
+            return;
+          }
+          resolve(ack);
+        });
+    });
   }
 
   /**
