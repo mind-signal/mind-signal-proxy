@@ -59,7 +59,10 @@ describe('POST /status — headset status router', () => {
 
   it.each([
     ['missing group_id', { ...validBody, group_id: undefined }],
+    ['empty group_id', { ...validBody, group_id: '' }],
     ['non-integer subject_idx', { ...validBody, subject_idx: 1.5 }],
+    ['subject_idx below range (0)', { ...validBody, subject_idx: 0 }],
+    ['subject_idx above range (3)', { ...validBody, subject_idx: 3 }],
     ['missing status', { ...validBody, status: undefined }],
     ['non-numeric silent_seconds', { ...validBody, silent_seconds: 'long' }],
   ])('%s → 400 {error:"bad_request"}, not forwarded', async (_name, body) => {
