@@ -1,7 +1,13 @@
 import { io, Socket } from 'socket.io-client';
 import { config } from '../config';
-import type { SampleEnvelope } from '../types/envelope';
-import type { HeadsetStatus, StatusAck } from '../routes/status';
+import {
+  PROXY_EVENT,
+  PROXY_NAMESPACE,
+  type BeAck,
+  type HeadsetStatus,
+  type SampleEnvelope,
+  type StatusAck,
+} from '../types/contract';
 
 /** Milliseconds to wait for a backend ack before treating as transport timeout (retryable). */
 const ACK_TIMEOUT_MS = 2000;
@@ -26,14 +32,6 @@ const DRAIN_INTERVAL_MS = 50;
  * (samples arrive at 1 Hz per subject).
  */
 const SUMMARY_INTERVAL_MS = 10_000;
-
-/** Shape of the backend ack payload on event `proxy:sample`. */
-interface BeAck {
-  ok: boolean;
-  duplicate?: boolean;
-  error?: string;
-  retryable?: boolean;
-}
 
 /** Internal queue entry: the envelope plus an in-flight flag to prevent double-send. */
 interface QueueEntry {
@@ -119,7 +117,7 @@ export class BeForwarder {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       // Connect directly to the /proxy namespace on the backend URL.
-      const socket = io(`${backendUrl}/proxy`, {
+      const socket = io(`${backendUrl}${PROXY_NAMESPACE}`, {
         transports: ['websocket'],
         auth: { engineSecret },
       });
@@ -212,7 +210,7 @@ export class BeForwarder {
     return new Promise((resolve) => {
       socket
         .timeout(STATUS_ACK_TIMEOUT_MS)
-        .emit('proxy:status', status, (err: Error | null, ack: StatusAck) => {
+        .emit(PROXY_EVENT.status, status, (err: Error | null, ack: StatusAck) => {
           if (err) {
             resolve({ ok: false, retryable: true, error: 'ack_timeout' });
             return;
@@ -315,7 +313,7 @@ export class BeForwarder {
 
       this.socket
         .timeout(ACK_TIMEOUT_MS)
-        .emit('proxy:sample', entry.envelope, (err: Error | null, ack: BeAck) => {
+        .emit(PROXY_EVENT.sample, entry.envelope, (err: Error | null, ack: BeAck) => {
           const counters = this._countersFor(entry.envelope.subject_idx);
           // ack 는 요약 경계를 넘어 도착할 수 있음. 그때도 group_id 를 남김
           counters.groupIds.add(entry.envelope.group_id);

@@ -1,27 +1,9 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { config } from '../config';
+import { HeadsetStatusSchema, type HeadsetStatus, type StatusAck } from '../types/contract';
 
-/**
- * DE→Proxy 헤드셋 상태 경보 본문. BE로 전달하는 `proxy:status` payload와 같은 네 필드임.
- * group_id 최소 길이와 subject_idx 범위는 BE 검증과 같게 둠 — BE가 거부할 입력을
- * 프록시가 통과시키면 엔진은 400이 아닌 502를 받아 원인을 알 수 없음.
- */
-export const HeadsetStatusSchema = z.object({
-  group_id: z.string().min(1),
-  subject_idx: z.number().int().min(1).max(2),
-  status: z.string(),
-  silent_seconds: z.number().optional(),
-});
-
-export type HeadsetStatus = z.infer<typeof HeadsetStatusSchema>;
-
-/** BE ack 형태 — `proxy:sample`과 같은 계약임. */
-export interface StatusAck {
-  ok: boolean;
-  retryable?: boolean;
-  error?: string;
-}
+// 계약 정의는 types/contract가 정본임. 기존 import 경로를 유지하려고 다시 내보냄
+export { HeadsetStatusSchema, type HeadsetStatus, type StatusAck };
 
 /** ingest.ts의 port 관례와 같은 narrow structural port임 (vi mock 직접 할당 가능). */
 export interface StatusForwarderPort {
