@@ -177,4 +177,29 @@ describe('BeForwarder.forwardStatus — mock backend', () => {
     await expect(forwarder.forwardStatus(validBody)).resolves.toEqual({ ok: true });
     expect(received).toEqual([validBody]);
   });
+
+  it('backend acks with no payload → {ok:false, retryable:false, error:"invalid_ack"}', async () => {
+    const httpServer = createServer();
+    const ioServer = new SocketIoServer(httpServer);
+    ioServer.of('/proxy').on('connection', (socket) => {
+      socket.on('proxy:status', (_payload: unknown, ackFn: (ack?: StatusAck) => void) => {
+        ackFn();
+      });
+    });
+    shutdown = () =>
+      new Promise((resolve) => {
+        ioServer.close(() => httpServer.close(() => resolve()));
+      });
+    await new Promise<void>((resolve) => httpServer.listen(0, resolve));
+    const port = (httpServer.address() as AddressInfo).port;
+
+    forwarder = new BeForwarder();
+    await forwarder.connect(`http://localhost:${port}`, TEST_SECRET);
+
+    await expect(forwarder.forwardStatus(validBody)).resolves.toEqual({
+      ok: false,
+      retryable: false,
+      error: 'invalid_ack',
+    });
+  });
 });

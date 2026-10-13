@@ -213,7 +213,16 @@ export class BeForwarder {
       socket
         .timeout(STATUS_ACK_TIMEOUT_MS)
         .emit('proxy:status', status, (err: Error | null, ack: StatusAck) => {
-          resolve(err ? { ok: false, retryable: true, error: 'ack_timeout' } : ack);
+          if (err) {
+            resolve({ ok: false, retryable: true, error: 'ack_timeout' });
+            return;
+          }
+          // The route reads ack.ok; a backend that acks with nothing must not crash it.
+          if (!ack || typeof ack.ok !== 'boolean') {
+            resolve({ ok: false, retryable: false, error: 'invalid_ack' });
+            return;
+          }
+          resolve(ack);
         });
     });
   }
