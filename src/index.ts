@@ -13,6 +13,8 @@ import { PendingRegistry } from './services/pending-registry'; // 기존 index.t
 import { createHeartbeatRouter } from './routes/heartbeat';
 import { createIngestRouter } from './routes/ingest';
 import type { PairBufferPort, BeForwarderPort } from './routes/ingest'; // CX2-1
+import { createStatusRouter } from './routes/status';
+import type { StatusForwarderPort } from './routes/status';
 // === 신규 service import ===
 import { PairBuffer } from './services/pair-buffer';
 import { BeForwarder } from './services/be-forwarder';
@@ -24,6 +26,8 @@ import type { BeNotifierPort } from './services/be-notifier';
 export interface IngestDeps {
   pairBuffer: PairBufferPort;
   beForwarder: BeForwarderPort;
+  // 생략 가능 — 기존 2-필드 호출(테스트 mock 포함) 무영향
+  statusForwarder?: StatusForwarderPort;
 }
 
 export function createApp(
@@ -44,12 +48,15 @@ export function createApp(
   // 생략 시 fresh 생성 — connect 안 함(createApp no-socket 계약 보존, 무인자 부작용 0)
   const pairBuffer = ingestDeps?.pairBuffer ?? new PairBuffer();
   const beForwarder = ingestDeps?.beForwarder ?? new BeForwarder();
+  // 생략 시 미연결 BeForwarder — /status는 503 backend_not_connected로 응답함
+  const statusForwarder = ingestDeps?.statusForwarder ?? new BeForwarder();
 
   app.use(express.json());
   app.use('/health', createHealthRouter(monitor));
   app.use('/register', createRegisterRouter(registry, { beNotifier: notifier }));
   app.use('/heartbeat', createHeartbeatRouter(monitor)); // factory
   app.use('/ingest', createIngestRouter({ pairBuffer, beForwarder })); // /ingest/sample
+  app.use('/status', createStatusRouter({ statusForwarder })); // 헤드셋 상태 경보
   app.use('/control/assign-group', createControlAssignGroupRouter(registry));
   return app;
 }
@@ -107,7 +114,12 @@ if (require.main === module) {
       beNotifier.notifyUnregister({ subjectIndex: subjectIdx, engineUrl: deUrl });
     },
   );
-  const app = createApp(monitor, registry, { pairBuffer, beForwarder }, beNotifier);
+  const app = createApp(
+    monitor,
+    registry,
+    { pairBuffer, beForwarder, statusForwarder: beForwarder },
+    beNotifier,
+  );
   app.listen(config.PROXY_PORT, () => {
     console.log(`mind-signal-proxy listening on port ${config.PROXY_PORT}`);
   });
